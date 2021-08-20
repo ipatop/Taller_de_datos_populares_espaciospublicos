@@ -1,0 +1,20 @@
+---
+title: "Objetivos Agosto 23 2021"
+author: "TDP-EP"
+date: "8/20/2021"
+output: html_document
+---
+
+# Objetivos del día
+
+* Retomando: Asegurarnos de tener R en marcha: paquetes `sf`,`ggplot2`,`leaflet`,`osmdata` instalados y andando.
+
+* Primeros gráficos: explorar el script elemental de /Encuentro1 usado para hacer gráficos. Explorar notebook de ejemplo de Inés en /Encuentro2.
+
+* Descargar datasets del gobierno y comparar con OSM
+
+  - Estudiar áreas, distribución espacial  y metadata de los parques para cada datasets.
+  - Comparar datasets identificando parques en común y parques faltantes. Discutir criterio de elección sobre qué retener y qué eliminar.
+  - Para uno o todos los datasets caracterizar como se distribuyen los parques en la ciudad: distancias entre parques, distancia promedio a un parque, cantidad de metros cuadrados de parque, posibilidad de combinar poligonos, etc.
+  
+* Empezar a pensar en embeber los parques con otra información: area del parque, cantidad de parque en las inmediaciones, si tiene o no juegos, espacio para perros, etc.
