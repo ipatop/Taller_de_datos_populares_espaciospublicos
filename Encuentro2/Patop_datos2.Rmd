@@ -1,0 +1,252 @@
+---
+title: "Trabajo final Módulo: Ciencia de datos II"
+subtitle: "Profesores: María de los Ángeles Scetta"
+author: "Ines Lucia Patop: inespatop@brandeis.edu"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    df_print: paged
+    theme: united
+    toc_float: true
+    collapsed: false
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introducción, objetivos y preguntas.
+
+La Ciudad de Buenos Aires es la ciudad capital de la Republica Argentina, es una ciudad autónoma con independencia politica del Gobierno Federal. Es el territorio económicamente mas rico del país, pero con tasas de desigualdad económica y social crecientes. 
+
+En la ciudad hay barrios populares con características particulares que pueden asimilarse a las conocida favelas y territorios favelizados presentes en otras ciudades de Latinoamérica. Dichos barrios tienen ciertas particularidades sociohistoricas que configuran condiciones de gran pobreza y hacinamiento con un limitado acceso a servicios públicos y de recreación. Al mismo tiempo, en dichos barrios hay presencia de organizaciones sociales de diversos origines y con diversos propósitos como educación, alimentación o recreación.
+
+Me propongo entonces analizar la distribución geográfica de las organizaciones sociales en la Ciudad de Buenos Aires y su relación con la localización de los barrios populares en la ciudad. Así mismo me propongo mapear los parques como una forma de comenzar a ver el acceso a servicios ecológicos como zonas verdes de esparcimiento y de recreación.
+
+# Librerías
+
+Utilizaré las siguentes librerías 
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(sf)
+library(ggmap)
+library(leaflet)
+library(osrm)
+library(osmdata)
+library("RColorBrewer")
+```
+
+# Carga de datos y filtrado
+
+Los datos georeferenciados de las organizationes sociales fueron descargados del [portal de datos del Gobierno de la Ciudad de Buenos Aires](https://data.buenosaires.gob.ar/dataset/organizaciones-sociales/resource/159676e0-127a-4903-91a1-f7b306cc1bb2). Los mismo se encuentran actualizados al 12 de Diciembre de 2019.
+
+El resto de los datos serán descargados vía Open Street map (OSM) y del portal de datos a nivel nacional [datos.gob.ar](https://datos.gob.ar/dataset/desarrollo-social-registro-nacional-barrios-populares/archivo/desarrollo-social_9a951270-60dd-4f21-aa19-4ef1205620bd)
+
+## Carga de organizaciones sociales
+
+```{r }
+org.soc <- read.csv("organizaciones-sociales.csv")
+```
+
+### Análisis exploratorio
+
+Miro el comienzo del archivo.
+```{r}
+head(org.soc)
+```
+
+Exploro que categorías hay disponibles.
+```{r}
+names(org.soc)
+```
+
+Ahora exploro que tipo de actividades están mapeadas.
+
+```{r}
+unique(org.soc$actividad)
+```
+
+### Filtrado
+
+Selecciono las columnas deseadas: nombre y ID de la organización, su localización y datos de que función cumplen. 
+
+```{r}
+org.soc.filt <- org.soc[,c(1:4,19,20,23:25)]
+```
+
+Luego elimino cualquier dato que este incompleto. En particular este data frame tiene datos faltantes que están guardados como "", lo que hago entonces es convertirlos en NAs y eso luego lo filtro con la función `complte.cases`
+
+```{r}
+#cambio a NA los "missing cases"
+org.soc.filt[org.soc.filt==""]<-NA
+head(org.soc.filt)
+```
+
+Veo ahora como se ve el data frame, sus dimensiones antes y después de filtrar.
+
+```{r}
+dim(org.soc.filt)
+dim(org.soc.filt[complete.cases(org.soc.filt),])
+```
+
+Filtrado.
+
+```{r}
+org.soc.filt<-org.soc.filt[complete.cases(org.soc.filt),]
+```
+
+# Mapeo
+
+## Datos observados sin mapa
+
+Primero tenemos los datos sin mapeo y ya observamos una distribución no homogénea. Esto puede deberse a razones de muestreo o de necesidad social.
+
+```{r}
+ggplot()+
+  geom_point(data=org.soc.filt, aes(x=long, y=lat, color=tipo_de_or), size=1,alpha=0.5, inherit.aes = FALSE, alpha=0.5) + scale_color_manual(values=c("blue", "darkorange", "red2"))+
+  labs(title="Organizaciones sociales",
+       subtitle="Ciudad de buenos aires",
+       caption="Fuente: https://data.buenosaires.gob.ar/dataset/?groups=desarrollo-humano",colour = "Tipo de organización")
+```
+
+## Descarga del Mapa y mapeo
+
+En particular nos interesa ver donde se encuentran localizadas estas organizaciones dentro de la ciudad de buenos aires. Dada la distribución de los datos usarlos para extraer la caja de coordenadas no parece adecuado. Elijo entonces, descargar el mapa mediante Open Street Map (OSM). 
+
+```{r,warning=F}
+bbox_ba <- getbb("Buenos Aires, Argentina")
+```
+
+Generamos el mapa y el poligono de limites de la ciudad.
+
+```{r, message=FALSE, warning=FALSE}
+mapa_ba <- get_stamenmap(bbox_ba,  zoom = 12)
+
+polygon_ba <- getbb("Buenos Aires, Argentina",
+                            format_out = "sf_polygon")
+
+ggmap(mapa_ba)+
+  geom_sf(data=polygon_ba$multipolygon, fill=NA, size=0.5, color="black", inherit.aes = FALSE)
+```
+
+Ahora agregamos las organizaciones sociales al mapa. Vemos, como dijimos anteriormente, que las organizaciones sociales no se encuentran distribuidas homogéneamente.
+
+```{r}
+
+ggmap(mapa_ba) +
+  geom_point(data=org.soc.filt, aes(x=long, y=lat, color=tipo_de_or), size=1,alpha=0.5, inherit.aes = FALSE, alpha=0.5) + scale_color_manual(values=c("blue", "darkorange", "red2")) +
+  labs(title="Organizaciones sociales",
+       subtitle="Ciudad de buenos aires",
+       caption="Fuente: https://data.buenosaires.gob.ar/dataset/?groups=desarrollo-humano",
+       colour = "Tipo de organización")+
+  theme_void()+
+  geom_sf(data=polygon_ba$multipolygon, fill=NA, size=0.5, color="black", inherit.aes = FALSE)
+
+```
+
+## Inclusión de calles
+
+Podemos ver que mientras que las organizaciones de Gestion Estatal se encuentran más dispersos y en zonas de avenidas, las organizaciones sociales se encuentran concentradas y en espacos con calles más pequeñas. 
+
+De alguna manera la función ´st_intersection´ no parece estar funcionando correctamente. Esto parece provenir de alguna incompatibilidad entre las librerias y sus versiones ("old-style crs object detected; please recreate object with a recent sf::st_crs()"). Las conclusiones no se ven afectadas por el momento. Así que lo elimino poniendo un comentario.
+
+```{r}
+calles_ba <- opq(bbox_ba) %>%
+                      add_osm_feature(key = "highway")
+#transformo en mapa
+calles_ba <- osmdata_sf(calles_ba)
+#extraemos las lineas
+calles_ba <- calles_ba$osm_lines
+#filtro adentro de la ciudad
+#calles_ba<- st_intersection(calles_ba, polygon_ba$multipolygon)
+
+#Voy a mapear solo avenidad
+ggmap(mapa_ba)+
+    geom_sf(data = calles_ba %>% filter(., str_detect(name, "Avenida")), color="darkred", alpha=0.25, inherit.aes = FALSE)+
+  geom_point(data=org.soc.filt, aes(x=long, y=lat, color=tipo_de_or), size=1,alpha=0.5, inherit.aes = FALSE, alpha=0.5) + scale_color_manual(values=c("blue", "darkorange", "red2")) +
+  labs(title="Organizaciones sociales",
+       subtitle="Ciudad de buenos aires",
+       caption="Fuente: https://data.buenosaires.gob.ar/dataset/?groups=desarrollo-humano",
+       colour = "Tipo de organización")+
+  geom_sf(data=polygon_ba$multipolygon, fill=NA, size=0.5, color="black", inherit.aes = FALSE)+
+  theme_void()
+
+```
+
+## Inclusión de espacios verdes
+
+Vemos a simple vista que los parques tampoco se encuentran distribuidos homogéneamente, con una mayor densidad en la zona norte. 
+
+```{r}
+parques_ba <- opq(bbox_ba) %>%
+                    add_osm_feature(key = "leisure", value = "park")
+#transformo en mapa
+parques_ba <- osmdata_sf(parques_ba)
+
+#extraemos los poligonos
+parques_ba  <- parques_ba$osm_polygons
+
+#filtro adentro de la ciudad
+#parques_ba <- st_intersection(parques_ba, polygon_ba)
+#parques_ba <- parques_ba[!is.na(parques_ba$addr.city),]
+
+#Voy a mapear solo avenidas y parques
+ggmap(mapa_ba)+
+  geom_sf(data = parques_ba , fill="darkgreen", alpha=0.5, inherit.aes = FALSE)+
+  geom_point(data=org.soc.filt, aes(x=long, y=lat, color=tipo_de_or), size=1,alpha=0.5, inherit.aes = FALSE, alpha=0.5) + scale_color_manual(values=c("blue", "darkorange", "red2")) +
+  labs(title="Organizaciones sociales",
+       subtitle="Ciudad de buenos aires",
+       caption="Fuente: https://data.buenosaires.gob.ar/dataset/?groups=desarrollo-humano",
+       colour = "Tipo de organización")+
+  geom_sf(data=polygon_ba$multipolygon, fill=NA, size=0.5, color="black", inherit.aes = FALSE)+
+  theme_void()
+```
+
+# Análisis incluyendo Barrios populares
+
+Por un tema de claridad decido usar otro mapa de fondo en vez del de OSM. Voy a agregar los barrios populares y filtrar solo los de la ciudad de buenos aires. Se ve claramente que las organizaciones sociales están ADENTRO de los barrios. 
+
+```{r, message=FALSE}
+barrios_pop <- st_read("https://datosabiertos.desarrollosocial.gob.ar/dataset/0d022767-9390-486a-bff4-ba53b85d730e/resource/97cc7d10-ad4c-46cb-9ee4-becb402adf9f/download/renabap-2020-11-20.geojson")
+barrios_pop <- barrios_pop %>% filter(Provincia=="Ciudad de Buenos Aires")
+
+#mapa de los barrios de la ciudad
+barrios<- read_sf("https://cdn.buenosaires.gob.ar/datosabiertos/datasets/barrios/barrios.geojson")
+
+#Filtrado de parques dentro de la ciudad
+parques_ba<-st_join(parques_ba,barrios)
+parques_ba<-parques_ba[!is.na(parques_ba$barrio),]
+
+ggplot()+geom_sf(data = barrios)+
+  geom_sf(data=barrios_pop, fill="black")+
+  geom_sf(data = parques_ba , fill="darkgreen", alpha=0.5, inherit.aes = FALSE)+
+  geom_point(data=org.soc.filt, aes(x=long, y=lat, color=tipo_de_or), size=0.5,alpha=0.5, inherit.aes = FALSE, alpha=0.5) + scale_color_manual(values=c("blue", "darkorange", "red2"))+
+  labs(title="Organizaciones sociales y Barrios Populares",
+       subtitle="Ciudad de buenos aires",
+       caption="Fuentes: https://data.buenosaires.gob.ar/dataset/?groups=desarrollo-humano \n https://cdn.buenosaires.gob.ar/datosabiertos/datasets/barrios/barrios.geojson")
+
+```
+
+# Mapa interactivo de organizaciones sociales
+
+Me pareció interesante crear un mapa interactivo con la información de las organizaciones sociales mapeadas.
+Tenemos que convertir el data frame de organizaciones sociales en un data set geográfico. Hacemos eso con la función `st_as_sf`
+
+```{r}
+#Primero convierto
+org.soc.filt_map<-st_as_sf(org.soc.filt,coords = c("long", "lat"))
+
+#luego mapeo y agrego pop-ups con la información
+leaflet(org.soc.filt_map) %>%
+  addTiles() %>%
+  addMarkers(popup =paste("Nombre: ",org.soc.filt_map$nom_mapa,"Actividad: ", org.soc.filt_map$actividad, "<br>", "Tipo: ", org.soc.filt_map$tipo_de_or) )
+
+```
+
+# Conclusiones finales
+
+En este análisis vimos que la distribución de las organizaciones sociales en la Ciudad de Buenos Aires se encuentra correlacionada con la presencia de barrios populares. Por diversas razones esto parece una conclusión un tanto obvia. Sin embargo, parece que la base de datos puede estar sesgada con un muestreo exhaustivo en la zona sur y este de la ciudad con una complete falta de datos en otras zonas. 
+Es interesante sin embargo ver la densidad de organizaciones sociales no gubernamentales dentro de los barrios populares en comparación con la presencia de organizaciones gubernamentales.
