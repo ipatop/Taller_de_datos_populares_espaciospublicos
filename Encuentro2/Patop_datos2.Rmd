@@ -129,6 +129,15 @@ polygon_ba <- getbb("Buenos Aires, Argentina",
                             format_out = "sf_polygon")
 
 ggmap(mapa_ba)+
+  geom_sf(data=polygon_ba$multipolygon, fill=NA, size=0.5, color="black", inherit.aes = FALSE) 
+
+ggmap(mapa_ba) +
+  geom_point(data=org.soc.filt, aes(x=long, y=lat, color=tipo_de_or), size=1,alpha=0.5, inherit.aes = FALSE, alpha=0.5) + scale_color_manual(values=c("blue", "darkorange", "red2")) +
+  labs(title="Organizaciones sociales",
+       subtitle="Ciudad de buenos aires",
+       caption="Fuente: https://data.buenosaires.gob.ar/dataset/?groups=desarrollo-humano",
+       colour = "Tipo de organización")+
+  theme_void()+
   geom_sf(data=polygon_ba$multipolygon, fill=NA, size=0.5, color="black", inherit.aes = FALSE)
 ```
 
@@ -190,17 +199,20 @@ parques_ba <- osmdata_sf(parques_ba)
 parques_ba  <- parques_ba$osm_polygons
 
 #filtro adentro de la ciudad
-#parques_ba <- st_intersection(parques_ba, polygon_ba)
-#parques_ba <- parques_ba[!is.na(parques_ba$addr.city),]
+parques_ba <- st_intersection(parques_ba, polygon_ba)
+ciudad = polygon_ba$multipolygon[1,]
+st_intersects(ciudad,parques_ba)[[1]]
+
+parques_ba <- parques_ba[!is.na(parques_ba$addr.city),]
 
 #Voy a mapear solo avenidas y parques
 ggmap(mapa_ba)+
   geom_sf(data = parques_ba , fill="darkgreen", alpha=0.5, inherit.aes = FALSE)+
-  geom_point(data=org.soc.filt, aes(x=long, y=lat, color=tipo_de_or), size=1,alpha=0.5, inherit.aes = FALSE, alpha=0.5) + scale_color_manual(values=c("blue", "darkorange", "red2")) +
-  labs(title="Organizaciones sociales",
-       subtitle="Ciudad de buenos aires",
-       caption="Fuente: https://data.buenosaires.gob.ar/dataset/?groups=desarrollo-humano",
-       colour = "Tipo de organización")+
+  #geom_point(data=org.soc.filt, aes(x=long, y=lat, color=tipo_de_or), size=1,alpha=0.5, inherit.aes = FALSE, alpha=0.5) + scale_color_manual(values=c("blue", "darkorange", "red2")) +
+  #labs(title="Organizaciones sociales",
+       # subtitle="Ciudad de buenos aires",
+       # caption="Fuente: https://data.buenosaires.gob.ar/dataset/?groups=desarrollo-humano",
+       # colour = "Tipo de organización")+
   geom_sf(data=polygon_ba$multipolygon, fill=NA, size=0.5, color="black", inherit.aes = FALSE)+
   theme_void()
 ```
