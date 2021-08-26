@@ -1,7 +1,9 @@
 require(patchwork)
 require(leaflet)
 require(osmdata)
+require(htmlwidgets)
 require(sf)
+require(ggmap)
 
 bb = getbb('Ciudad Autonoma de Buenos Aires, Argentina',format_out = 'polygon')
 #plot(bb[[2]][[1]],type='l')
@@ -73,6 +75,8 @@ ggmap(mapa_ba)+
 map = leaflet() %>% addProviderTiles(providers$OpenStreetMap) %>%
   addPolygons(data=st_make_valid(parks_ciudad),color='red',fillColor='red',weight=1)   %>% 
   addPolygons(data=parks,color='blue',fillColor='blue',weight = 1) 
+
 map
 
 
+saveWidget(map,'mapaOSM_mas_ciudad.html')
