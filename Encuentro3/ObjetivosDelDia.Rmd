@@ -1,0 +1,22 @@
+---
+title: "Objetivos Agosto 30 2021"
+author: "TDP-EP"
+date: "8/20/2021"
+output: html_document
+---
+
+# Objetivos del día
+
+* Retomando: Revisar script de clase pasada para levantar datos de OSM y de la ciudad y graficarlos conjuntamente. Tenemos ya visto que OSM es más acotado en los parques que presenta. Los datos del gobierno incluyen a Soldati (?) como parque, así como varios espacios semipúblicos. También vimos que el gobierno incluye a las reservas ecológicas y a los parquecitos al lado de las autopistas como espacios verdes. Algo más específico que notamos es que el dataset del gobierno tiene los polígonos MUY particionados (por ejemplo, incluye caminos internos en plazas, aunque sean para peatones). Habría que decidir si llegado el caso nos interesa tanta desagregación o no.
+
+* Objetivos: Construir un criterio que nos permita seleccionar un subconjunto de poligonos que represente lo que nosotres entendemos por espacio verde / parque. Este criterio podría ser como una lista de items que combine tanto criterios conceptuales (indicando lo que estamos buscando capturar) como criterios numéricos o mecánicos (indicando en efecto cómo los seleccionamos). Respecto a esto, algunas ideas:
+
+  - Corte de área
+
+  - Corte de diámetro (al menos que el polígono tenga $a \times b$ metros cuadrados, indicando valores mínimos para $a$ y $b$).
+
+  - Que se encuentre en ambos datasets.
+
+  - Que sea completamente público.
+
+  - Se aceptan otros!
