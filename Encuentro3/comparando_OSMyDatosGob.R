@@ -101,6 +101,7 @@ par(mar=c(8,4,4,2))
 boxplot(areas ~ clasificac,data=parks_ciudad,las=2,cex.axis=0.5,xlab='')
 abline(h=c(10,50,100)**2,col='red')
 
+# Graficamos parques de áreas pequeñas (ni se ven)
 
 i = which(parks$areas<10**2)
 
@@ -114,6 +115,8 @@ map = leaflet() %>% addProviderTiles(providers$OpenStreetMap) %>%
 
 map
 
+# Graficamos parques de CIUDAD de algunas categorías
+
 i = which(!is.element(parks_ciudad$clasificac,c('PLAZOLETA','CANTERO CENTRAL')))
 
 i = which(is.element(parks_ciudad$clasificac,c('JARDÍN','PATIO','PARQUE SEMIPÚBLICO')))
@@ -126,7 +129,3 @@ map = leaflet() %>% addProviderTiles(providers$OpenStreetMap) %>%
 
 map
 
-
-table(parks_ciudad$clasificac)
-
-saveWidget(map,'mapaOSM_mas_ciudad.html')
