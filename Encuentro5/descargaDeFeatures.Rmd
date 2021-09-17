@@ -6,9 +6,6 @@ date: "9/13/2021"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 ## Objetivos
 
@@ -67,12 +64,26 @@ if(file.exists('parquesCorteArea2_5perc.geojson')){
   
   parksOSM = parksOSM %>% filter(area/100**2>2.5/100)
   st_write(parksOSM,'parquesCorteArea2_5perc.geojson')
+  st_write(st_transform(st_centroid(parksOSM),crs=4326),'parquesCorteArea2_5perc_CENTROIDES.geojson')
 }
 ```
 Checkeo rápido de que esté en orden el mapa:
 
 ```{r}
 parksOSM  %>% ggplot() + geom_sf()
+```
+## Atributos de OSM
+
+Carguemos el listado completo de atributos que podemos descargar de OSM
+
+```{r}
+OSMfields = read.csv('OSM_feature-tages.csv')
+head(OSMfields)
+```
+Podemos descargar con esto cualquier atributo de interés con la sentencia
+
+```
+add_osm_feature(key = feature, value = tag)
 ```
 
 
@@ -99,17 +110,114 @@ D = st_distance(parksOSM,paradas_ba %>% st_transform(crs=st_crs(parksOSM)))
 ```{r}
 f = function(radio) apply(D,1,function(x) sum(x<=radio))
 
-parksOSM = parksOSM %>% mutate(radio0m = f(0), radio100m = f(100),radio200m=f(200),radio500m=f(500),radio1000m=f(1000))
+parksOSMtry = parksOSM %>% mutate(radio0m = f(0), radio100m = f(100),radio200m=f(200),radio500m=f(500),radio1000m=f(1000))
 ```
 
 
 Para chusmear cuantos hay en cada clase
 ```{r}
-parksOSM$radio0m %>% hist(breaks=0:10-.5,xlab='Cantidad de paradas de colectivo a 0m')
-parksOSM$radio100m %>% hist(breaks=0:50-.5,xlab='Cantidad de paradas de colectivo a 100m')
-parksOSM$radio200m %>% hist(breaks=0:100-.5,xlab='Cantidad de paradas de colectivo a 200m')
-parksOSM$radio500m %>% hist(breaks=0:500-.5,xlab='Cantidad de paradas de colectivo a 500m')
-parksOSM$radio1000m %>% hist(breaks=0:500-.5,xlab='Cantidad de paradas de colectivo a 1000m')
+parksOSMtry$radio0m %>% hist(breaks=0:10-.5,xlab='Cantidad de paradas de colectivo a 0m')
+parksOSMtry$radio100m %>% hist(breaks=0:50-.5,xlab='Cantidad de paradas de colectivo a 100m')
+parksOSMtry$radio200m %>% hist(breaks=0:100-.5,xlab='Cantidad de paradas de colectivo a 200m')
+parksOSMtry$radio500m %>% hist(breaks=0:500-.5,xlab='Cantidad de paradas de colectivo a 500m')
+parksOSMtry$radio1000m %>% hist(breaks=0:500-.5,xlab='Cantidad de paradas de colectivo a 1000m')
 ```
 
-Viendolo me quedaría con `200m`
+Viendolo me quedaría con `200m` como radio razonable.
+```{r}
+parksOSM = parksOSM %>% mutate(paradasA200m=f(200))
+```
+
+
+# Perreras / dog-parks / parquiperros
+
+Un atributo interesante es el de `dog-parks` que tiene osm.
+
+```{r}
+tag = 'dog_park'
+feature = OSMfields$feature[OSMfields$tag==tag]
+
+dogparks_ba <- opq(bb) %>%
+                    add_osm_feature(key = feature, value = tag) %>%
+  osmdata_sf() %>% trim_osmdata(bb) 
+```
+```{r}
+ggplot() +
+#(dogparks_ba$osm_points  %>% geom_sf(data = .)) +
+(dogparks_ba$osm_lines  %>%  geom_sf(data = .)) +
+(dogparks_ba$osm_polygons  %>%  geom_sf(data = .)) +
+(dogparks_ba$osm_multilines  %>% geom_sf(data = .)) +
+(dogparks_ba$osm_multipolygons  %>%  geom_sf(data=.))
+
+```
+Para checkear, acá es mejor un mapita navegable
+```{r}
+leaflet() %>% 
+  addProviderTiles(provider=providers$OpenStreetMap) %>%
+  #addCircleMarkers(data=dogparks_ba$osm_points) %>%
+  #addPolygons(data= dogparks_ba$osm_polygons) %>%
+  addPolygons(data= dogparks_ba$osm_multipolygons) #%>%
+  #addPolylines(data= dogparks_ba$osm_lines) 
+  
+```
+
+Conclusión: nos quedamos con `polygon` y `multipolygon`, y vemos que parques los interescan.
+
+```{r}
+
+dogparks_ba$osm_polygons %>% as.data.frame() 
+dogparks_ba$osm_multipolygons %>% as.data.frame() 
+
+parksConCanil = c(parksOSM %>% st_intersects(dogparks_ba$osm_polygons %>% st_transform(crs=st_crs(parksOSM)),.) %>% unlist(),
+  parksOSM %>% st_intersects(dogparks_ba$osm_multipolygons %>% st_transform(crs=st_crs(parksOSM)),.) %>% unlist())
+```
+
+
+Para checkear que no haya quedado afuera ningun parque:
+```{r}
+leaflet() %>% 
+  addProviderTiles(provider=providers$OpenStreetMap) %>%
+  addPolygons(data= parksOSM[parksConCanil,] %>% st_transform(crs=4326),color='red') %>%
+  #addPolygons(data= parksOSM[-parksConCanil,] %>% st_transform(crs=4326),color='green') %>%
+  addPolygons(data= dogparks_ba$osm_polygons) %>%
+  addPolygons(data= dogparks_ba$osm_multipolygons) #%>%
+  
+```
+
+Entonces agregamos un indicador con la cantidad de caniles que tiene cada parque
+
+```{r}
+parksOSM$caniles = st_intersects(parksOSM,st_join(dogparks_ba$osm_polygons,dogparks_ba$osm_multipolygons) %>% st_transform(crs=st_crs(parksOSM))) %>% sapply(length)
+```
+
+## Juegos para niñes
+
+Este atributo se llama `playground`
+
+```{r}
+tag = 'playground'
+feature = OSMfields$feature[OSMfields$tag==tag]
+
+playground_ba <- opq(bb) %>%
+                    add_osm_feature(key = feature, value = tag) %>%
+  osmdata_sf() %>% trim_osmdata(bb) 
+```
+```{r}
+ggplot() +
+#(dogparks_ba$osm_points  %>% geom_sf(data = .)) +
+(playground_ba$osm_lines  %>%  geom_sf(data = .)) +
+(playground_ba$osm_polygons  %>%  geom_sf(data = .)) +
+(playground_ba$osm_multilines  %>% geom_sf(data = .)) +
+(playground_ba$osm_multipolygons  %>%  geom_sf(data=.))
+
+```
+Para checkear, acá es mejor un mapita navegable
+```{r}
+leaflet() %>% 
+  addProviderTiles(provider=providers$OpenStreetMap) %>%
+  addCircleMarkers(data=playground_ba$osm_points) %>%
+  addPolygons(data= playground_ba$osm_polygons) %>%
+  addPolygons(data= playground_ba$osm_multipolygons) %>%
+  addPolylines(data= playground_ba$osm_lines) 
+  
+```
