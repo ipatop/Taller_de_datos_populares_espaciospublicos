@@ -1,0 +1,89 @@
+---
+title: "Mapeo transporte publico"
+author: "Ari e Ine"
+date: "9/13/2021"
+output: html_document
+---
+
+# Objetivos del día
+
+* Retomando: Hasta ahora tenemos mas o menos definidos lo que consideramos espacio publico pero nos falta ultimar 
+
+* Objetivos: 
+
+1. Construir un criterio que nos permita seleccionar un subconjunto de poligonos que represente lo que nosotres entendemos por espacio verde / parque. Este criterio podría ser como una lista de items que combine tanto criterios conceptuales (indicando lo que estamos buscando capturar) como criterios numéricos o mecánicos (indicando en efecto cómo los seleccionamos). Respecto a esto, algunas ideas:
+
+  - Corte de área
+
+  - Corte de diámetro (al menos que el polígono tenga $a \times b$ metros cuadrados, indicando valores mínimos para $a$ y $b$).
+
+  - Que se encuentre en ambos datasets.
+
+  - Que sea completamente público.
+
+  - Se aceptan otros!
+  
+2. Definir algun criterio o __score__ de calidad de cada espacio verde de a cuerdo a los servicios que ofrece.
+
+3. Mapear y filtrar las distintas formas de transporte publico:
+
+Aca creo que tenemos de nuevo dos opciones, OSM y el gobierno de la ciudad. OSM esta bastante bien y sabemos como suarlo. El gobierno tiene los datos guardados en una API (https://www.buenosaires.gob.ar/desarrollourbano/transporte/apitransporte). Deberiamos ver como catzo haevrlo funcionar.
+  
+# Libraries
+
+```{r message=FALSE,warning=FALSE}
+library(tidyverse)
+library(sf)
+library(ggmap)
+library(leaflet)
+library(osrm)
+library(osmdata)
+library("RColorBrewer")
+```
+
+# Descarga de Transporte público usando OSM
+
+OSM tiene una key para transporte publico https://wiki.openstreetmap.org/wiki/Map_features#Public_Transport voy a empezar usando solo el _stop_position_ que nos va a dar una idea de la posicion, luego podemos sumar mos cosas interesantes como _platform_. 
+
+Descarga de bbbox y creacion del mapa
+
+```{r message=FALSE,warning=FALSE}
+bbox_ba <- getbb("Buenos Aires, Argentina")
+mapa_ba <- get_stamenmap(bbox_ba,  zoom = 12)
+
+polygon_ba <- getbb("Buenos Aires, Argentina",
+                            format_out = "sf_polygon")
+
+ggmap(mapa_ba)+
+  geom_sf(data=polygon_ba$multipolygon, fill=NA, size=0.5, color="black", inherit.aes = FALSE)
+
+```
+
+Descarga de transporte publico, parece tener paradas de bondy, ferry, etc
+
+
+```{r message=FALSE,warning=FALSE}
+paradas_ba <- opq(bbox_ba) %>%
+                    add_osm_feature(key = "public_transport", value = "stop_position")
+
+paradas_ba  <- osmdata_sf(paradas_ba )
+
+#extraemos los puntos
+paradas_ba   <- paradas_ba$osm_points
+```
+
+Exploro
+
+```{r message=FALSE,warning=FALSE}
+names(paradas_ba)
+unique(paradas_ba$train)
+
+```
+
+Grafico
+```{r message=FALSE,warning=FALSE}
+# me da miedo mapear todo asi que voy a poner solo tren
+ggmap(mapa_ba)+
+  geom_sf(data =  paradas_ba %>% filter(train == "yes"), inherit.aes = FALSE)
+```
+
