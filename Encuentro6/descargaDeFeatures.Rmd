@@ -264,8 +264,8 @@ parksOSM$JPN = sapply(st_intersects(parksOSM,playground_ba_sf %>% st_transform(c
 leaflet() %>% 
   addProviderTiles(provider=providers$OpenStreetMap) %>%
   addPolygons(data=parksOSM %>% st_transform(crs=4326),color=ifelse(parksOSM$JPN>0,'red','green')) %>%
-  addCircleMarkers(data=puntos_libre) %>%
-  addPolygons(data= playground_ba$osm_polygons) #%>%
+  addCircleMarkers(data=playground_ba_sf %>% st_collection_extract(type='POINT')) %>%
+  addPolygons(data= playground_ba_sf %>% st_collection_extract(type='POLYGON')) #%>%
   #addPolygons(data= playground_ba$osm_multipolygons) %>%
   #addPolylines(data= playground_ba$osm_lines)
   
@@ -303,8 +303,8 @@ parksOSM$teatro = sapply(st_intersects(parksOSM,teatro_ba_sf %>% st_transform(cr
 leaflet() %>% 
   addProviderTiles(provider=providers$OpenStreetMap) %>%
   addPolygons(data=parksOSM %>% st_transform(crs=4326),color=ifelse(parksOSM$teatro>0,'red','green')) %>%
-  addCircleMarkers(data=puntos_libre) %>%
-  addPolygons(data= df$osm_polygons) #%>%
+  addCircleMarkers(data=teatro_ba_sf %>% st_collection_extract(type='POINT')) %>%
+  addPolygons(data= playground_ba_sf %>% st_collection_extract(type='POLYGON')) #%>%
   #addPolygons(data= playground_ba$osm_multipolygons) %>%
   #addPolylines(data= playground_ba$osm_lines)
   
@@ -365,27 +365,17 @@ toilets_ba <- opq(bb) %>%
 
 ```
 ```{r}
-df = toilets_ba
+toilets_ba_sf = simply_osmDL(toilets_ba)
 leaflet() %>% 
   addProviderTiles(provider=providers$OpenStreetMap) %>%
   addPolygons(data=parksOSM %>% st_transform(crs=4326),color='green') %>%
-  addCircleMarkers(data=df$osm_points) %>%
-  addPolygons(data= df$osm_polygons) #%>%
-  #addPolygons(data= df$osm_multipolygons) #%>%
-  #addPolylines(data= df$osm_lines)
-
-df = toilets_ba_sf
-leaflet() %>% 
-  addProviderTiles(provider=providers$OpenStreetMap) %>%
-  addPolygons(data=parksOSM %>% st_transform(crs=4326),color='green') %>%
-  addCircleMarkers(data=df %>% st_collection_extract(type='POINT') %>% st_jitter()) %>%
-  addPolygons(data= df %>% st_collection_extract(type='POLYGON')) #%>%
+  addCircleMarkers(data=toilets_ba_sf %>% st_collection_extract(type='POINT') %>% st_jitter()) %>%
+  addPolygons(data= toilets_ba_sf %>% st_collection_extract(type='POLYGON')) #%>%
   #addPolygons(data= df$osm_multipolygons) #%>%
   #addPolylines(data= df$osm_lines)
 ```
 
 ```{r}
-toilets_ba_sf = simply_osmDL(toilets_ba)
 parksOSM$toilets = sapply(st_intersects(parksOSM,toilets_ba_sf %>% st_transform(crs=st_crs(parksOSM))),length)
 
 leaflet() %>% 
@@ -397,11 +387,7 @@ leaflet() %>%
 # Bicisenda
 
 ```{r}
-require(jsonlite)
 bicisendas_ba = st_read('https://cdn.buenosaires.gob.ar/datosabiertos/datasets/transporte/ciclovias/ciclovias_WGS84.geojson') 
-
-```
-```{r}
 df = bicisendas_ba
 leaflet() %>% 
   addProviderTiles(provider=providers$OpenStreetMap) %>%
@@ -450,5 +436,14 @@ parksOSM$bebederos %>% table() %>% barplot()
 
 ```{r}
 parksOSM %>% as.data.frame()
+```
+
+```{r}
+parksOSM$AreaMayorMediaHect = parksOSM$area>100**2*.5
+```
+
+```{r}
+st_write(parksOSM,'parquesCorteArea2_5perc_fullfeatures.geojson')
+st_write(st_centroid(parksOSM),'parquesCorteArea2_5perc_fullfeatures_CENTROIDES.geojson')
 ```
 
