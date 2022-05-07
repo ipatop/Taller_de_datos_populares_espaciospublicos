@@ -1,0 +1,252 @@
+---
+title: "Estudio de distribución de parques y accesibilidad de los mismos"
+subtitle: "Data: OpenStreetMap y Datos Abiertos de la Ciudad de Buenos Aires"
+author: "Ines Patop, Ariel Salgado en el marco del Taller de Datos Populares"
+date: "07/05/2022"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    df_print: paged
+    theme: united
+    toc_float: true
+    collapsed: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Introdución
+
+En el marco del Taller de Datos Populares nos planteamos realizar un Análisis de la Distribución de los espacios verdes de la Ciudad de Buenos Aires y su accesibilidad via transporte público. Así mismo nos interesa ver como los precios de las propiedades en la ciudad correlaciona o no con la presencia de parques y su accesisibilidad.
+
+Para esto a lo largo de los encuentros realizamos lo siguiente:
+
+1. Construimos un criterio que nos permita seleccionar un subconjunto de los poligonos que represente lo que nosotres entendemos por espacio verde / parque. Este criterio combina tanto criterios conceptuales (indicando lo que estamos buscando capturar) como criterios numéricos o mecánicos (indicando en efecto cómo los seleccionamos). Respecto a esto, algunas ideas:
+
+  - Corte de área
+
+  - Corte de diámetro (al menos que el polígono tenga $a \times b$ metros cuadrados, indicando valores mínimos para $a$ y $b$).
+
+  - Que se encuentre en ambos datasets.
+
+  - Que sea completamente público.
+
+  - Se aceptan otros!
+  
+2. Definimos algun criterio o __score__ de calidad de cada espacio verde de a cuerdo a los servicios que ofrece. Ejemplo: tiene juegos para niñeces, tiene canchas de furbol, espacio cultoral, etc
+
+3. Mapeamos y filtramos las distintas formas de transporte publico: bicisenda, colectivo, subterrano, etc. 
+
+4. Usamos los datos del precenso 2022 para localizar la distribución de los radios censales y la cantidad de viviendas por radio
+
+Para ver el preprocesamiento y pasos intermedios este es [nuestro girhub](https://github.com/ipatop/Taller_de_datos_populares_espaciospublicos)
+
+# Paquetes a usar
+
+```{r include=TRUE,warning=FALSE,message=FALSE, fig.height=7,fig.width=7}
+library(viridis)
+library(RColorBrewer)
+require(sf)
+require(tidyverse)
+require(ggplot2)
+require(patchwork)
+require(ggmap)
+require(osmdata)
+```
+
+# Creamos los mapas desde Open Streat Map
+
+Evaluamos primero el mapeo del espacio
+
+```{r message=FALSE,warning=FALSE,fig.height=7,fig.width=7}
+bbox_ba <- getbb("Buenos Aires, Argentina")
+mapa_ba <- get_stamenmap(bbox_ba,  zoom = 12)
+
+polygon_ba <- getbb("Buenos Aires, Argentina",
+                            format_out = "sf_polygon")
+
+ggmap(mapa_ba)+
+  geom_sf(data=polygon_ba$multipolygon, fill=NA, size=0.5, color="black", inherit.aes = FALSE)+ggtitle("Ciudad Autónoma de Buenos Aires")
+
+```
+
+Luego mapeamos cada espacio verde. Para esto vamos a usar un archivo que generamos en encuentros anteriores en el cual mapeamos transporte y servicios de cada parque.
+
+```{r, message=FALSE, fig.height=7,fig.width=7}
+#descarga mapa de base
+bb = getbb('Ciudad Autonoma de Buenos Aires, Argentina',format_out = 'polygon')
+bbox_ba = getbb("Ciudad Autonoma de Buenos Aires, Argentina")
+
+#recrotar la ciudad
+ciudad = st_polygon(list(bb[[2]][[1]]))
+ciudad = st_sfc(ciudad)
+st_crs(ciudad) = 4326
+
+#descargar parques ya filtrados
+parques_full = st_read("Encuentro6/parquesCorteArea2_5perc_fullfeatures.geojson")
+parques_full = parques_full %>% st_transform(crs=4326)
+```
+
+# Estudio por área 
+
+Según algunas aproximaciones teóricas al urbanismo, los parques deberían tener al menos media hectarea para ser utilizables de forma óptima. Decidimos entonces hacer un estudio de la distribución del área de los espacios verdes de la ciudad.
+
+## Todos los parques, mostrando ambas áreas
+
+Vemos que la distribución de las áreas no es homogénea con la mayoría de los parques con área pequeña y un par con gran área.
+
+```{r, message=FALSE}
+ggplot(parques_full,aes(area))+geom_histogram(bins = 100)+labs(title = "Distribución de área de los parques en la ciuidad")
+#agrego cuartiles
+parques_full<-parques_full %>% mutate(cuartil = ntile(area, 4))
+#para mejorar la visualización agregamos un corte en el área
+ggplot(parques_full)+geom_density(aes(area,fill=as.factor(cuartil)))+labs(title = "Distribución de área de los parques en la ciuidad")+scale_fill_brewer(palette = "Dark2")+xlim(0,50000)
+```
+
+```{r, message=FALSE, fig.height=7,fig.width=7}
+ggplot() + theme_minimal()+ theme(legend.position = c(.8,.1))+
+  geom_sf(data=ciudad,fill='white') +
+  geom_sf(data=parques_full,mapping=aes(fill=area)) +
+  scale_fill_viridis_c(option = "plasma") +
+  ggtitle('Parques coloreados por área')
+
+ggplot() + theme_minimal()+ theme(legend.position = c(.8,.1))+
+  geom_sf(data=ciudad,fill='white') +
+  geom_sf(data=parques_full,mapping=aes(fill=area>=5e3)) +
+  scale_fill_discrete(name = "Area mayor a 1/2 ha",labels=c('No','Sí')) +
+  ggtitle('Parques coloreados por si su área es mayor a media hectárea')+
+  scale_fill_manual(values = c("darkgrey","darkorange")) 
+```
+
+## Todos los parques, areas <0.5ha
+
+```{r, message=FALSE, fig.height=7,fig.width=7}
+ggplot() + theme_minimal()+ theme(legend.position = c(.8,.1))+
+  geom_sf(data=ciudad,fill='white') +
+  geom_sf(data=parques_full %>% filter(area<5e3)) +
+  ggtitle('Parques con area < 1/2ha')
+```
+
+
+# Estudio de servicios por parque
+
+Mapeamos distintos servicios presentes en cada parque.
+
+## Juegos para niño/as
+```{r, message=FALSE, fig.height=7,fig.width=7}
+ggplot() + theme_minimal()+ theme(legend.position = c(.8,.15))+
+  geom_sf(data=ciudad,fill='white') +
+  geom_sf(data=parques_full %>% filter(area>=5e3),mapping=aes(fill=JPN)) +
+  ggtitle('Parques coloreados por cuántos Juegos para Niñes tienen')+
+  scale_fill_viridis_c(option = "plasma")
+```
+
+## Parques con estaciones de ejercicio o canchas para hacer deportes
+
+```{r, message=FALSE, fig.height=7,fig.width=7}
+ggplot() + theme_minimal()+ theme(legend.position = c(.8,.15))+
+  geom_sf(data=ciudad,fill='white') +
+  geom_sf(data=parques_full %>% filter(area>=5e3),mapping=aes(fill=fitness_station+canchas)) +
+  scale_fill_continuous(name='Cantidad de espacios')+
+  ggtitle('Parques coloreados por cuántos espacios de ejercicio físico tienen')+
+  scale_fill_viridis_c(option = "plasma")
+```
+
+# Estudio de transporte
+
+Mapeamos distintos medios de transporte y calculamos la distancia de cada parada al centro de cada parque. 
+
+## Ciclovía
+```{r, message=FALSE, fig.height=7,fig.width=7}
+ggplot() + theme_minimal() + theme(legend.position = c(.8,.15)) +
+  geom_sf(data=ciudad,fill='white') +
+  geom_sf(data=parques_full %>% filter(area>=5e3) %>% 
+            mutate('DBB'=case_when(distanciaBicisenda<=1e2 ~ '<1 cuadra',
+                      distanciaBicisenda<=1e3 ~ '<1 km',
+                      distanciaBicisenda>1e3 ~ '>1 km')),mapping=aes(fill=DBB)) +
+  scale_fill_brewer(name='Distancia a Ciclovía',palette = "YlOrRd") +
+  ggtitle('Parques coloreados por Distancia a Ciclovía')
+```
+
+## Paradas de colectivo
+
+
+
+```{r, message=FALSE, fig.height=7,fig.width=7}
+ggplot() + theme_minimal() + theme(legend.position = c(.8,.15)) +
+  geom_sf(data=ciudad,fill='white') +
+  geom_sf(data=parques_full %>% filter(area>=5e3),
+          mapping=aes(fill=paradasA200m)) +
+  scale_fill_continuous(name='Paradas de colectivo') +
+  ggtitle('Parques coloreados por cuántas paradas de colectivo tienen a menos de 200 metros')
+```
+
+# Estudio de población usando datos del precenso 2022
+
+Para sumar a este análisis un estudio de la población que accesde a cada parque descargamos los datos del precenso usando la página de [Poblaciones](https://mapa.poblaciones.org/map/#/@-37.169888,-62.904938,12z)
+
+```{r, message=FALSE, fig.height=7,fig.width=7}
+precenso = new.env()
+load('./Precenso_2021/precenso2021_06.RData',envir = precenso)
+precenso = as.list(precenso)
+precenso = precenso$dataset
+precenso = st_as_sf(precenso,coords=c('longitud_centroide','latitud_centroide'))
+st_crs(precenso) = 4326
+
+parques = parques_full %>% filter(area>=5e3)
+D = st_distance(parques,precenso)
+
+```
+
+Para realizar un modelo básico de influencia de cada parque a cada radio censal usamos un modelo de energía potencial
+
+```{r, message=FALSE, fig.height=7,fig.width=7}
+parques$potencial_viviendas = sapply(1:nrow(parques),function(i){
+  di = D[i,]
+  di = as.numeric(di)
+  di = ifelse(di<10,10,di)
+  -sum(precenso$ind01/di)
+})
+
+i = 1
+
+precenso$potencial_parques = sapply(1:nrow(precenso),function(i){
+  di = D[,i]
+  di = as.numeric(di)
+  di[di<10] = 10
+  sum(parques$area/1e4/di)
+})
+```
+
+Visualizando esos datos vemos que la distribución de los parques en relación con la cantidad de viviendas no es homogénea
+
+```{r, message=FALSE, fig.height=7,fig.width=7}
+# Todos los parques, potencial
+ggplot() + theme_minimal()+ theme(legend.position = c(.8,.1))+
+  geom_sf(data=ciudad,fill='white') +
+  geom_sf(data=parques,mapping=aes(fill=potencial_viviendas)) +
+  scale_fill_gradient(low='red',high='yellow')+
+  ggtitle('Parques coloreados por cuántas viviendas influyen')
+```
+
+
+```{r, message=FALSE, fig.height=12,fig.width=12}
+# Parques y radios censales, potencial
+ggplot() + theme_minimal()+ theme(legend.position = c(.1,.86))+
+  geom_sf(data=ciudad,fill='white') +
+  geom_sf(data=precenso,mapping=aes(color=log(potencial_parques)),size=1.3) +
+  scale_color_gradient(high='darkviolet',low='grey',name='lPoteParques')+
+  geom_sf(data=parques,mapping=aes(fill=log(-potencial_viviendas))) +
+  scale_fill_gradient(high='red',low='yellow',name='lPoteViviendas')+
+  ggtitle('Parques coloreados por cuántas viviendas influyen \n Radios censales coloreados por cuántos parques tienen influencia sobre ellos')
+
+```
+
+# Github con todos los encuentros y preprocesamientos
+
+https://github.com/ipatop/Taller_de_datos_populares_espaciospublicos
+
+
+

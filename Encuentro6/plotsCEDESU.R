@@ -4,6 +4,8 @@ require(ggplot2)
 require(patchwork)
 require(ggmap)
 require(osmdata)
+
+
 bb = getbb('Ciudad Autonoma de Buenos Aires, Argentina',format_out = 'polygon')
 bbox_ba = getbb("Ciudad Autonoma de Buenos Aires, Argentina")
 
