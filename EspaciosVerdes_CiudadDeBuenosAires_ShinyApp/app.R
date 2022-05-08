@@ -1,4 +1,5 @@
-#Script para tener la shiny app the parques
+#Script para tener la shiny app de parques
+# Autores Ines Patop y Ariel Salgado
 
 # Load packages ----
 library(shiny)
@@ -19,7 +20,7 @@ load("data/BAmap.RData")
 ui <- fluidPage(
   
   fluidRow( 
-    column(4, "Seleccion de Variable",varSelectInput(inputId = "var",label =  "Variable:", parques_full[33:42],))
+    column(4, "Seleccion de Variable",varSelectInput(inputId = "var",label =  "Variable:", parques_full[33:42]))
     ,
     column(4, "Seleccion de corte de área", sliderInput(inputId = "range", label = "Rango de área", min=0, max=max(parques_full$area), value = c(5000,10000)))),
  

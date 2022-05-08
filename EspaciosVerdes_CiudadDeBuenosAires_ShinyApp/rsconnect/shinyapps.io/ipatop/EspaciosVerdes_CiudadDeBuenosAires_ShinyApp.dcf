@@ -1,0 +1,13 @@
+name: EspaciosVerdes_CiudadDeBuenosAires_ShinyApp
+title: EspaciosVerdes_CiudadDeBuenosAires_ShinyApp
+username:
+account: ipatop
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 6258899
+bundleId: 5883966
+url: https://ipatop.shinyapps.io/EspaciosVerdes_CiudadDeBuenosAires_ShinyApp/
+when: 1652033201.66596
+lastSyncTime: 1652033201.66597
+asMultiple: FALSE
+asStatic: FALSE
