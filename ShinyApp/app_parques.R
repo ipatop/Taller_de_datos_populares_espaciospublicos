@@ -1,4 +1,6 @@
 #Script para tener la shiny app the parques
+
+# Load packages ----
 library(shiny)
 library(viridis)
 library(RColorBrewer)
@@ -9,103 +11,49 @@ require(patchwork)
 require(ggmap)
 require(osmdata)
 
-# Load packages ----
-library(shiny)
-library(maps)
-library(mapproj)
-
 # Load data ----
 load("data/BAmap.RData")
 # Source helper functions -----
-source("helpers.R")
 
 # User interface ----
 ui <- fluidPage(
-  titlePanel("Parques CABA"),
   
-  sidebarLayout(
-    sidebarPanel(
-      helpText("Mapea los espacios verdes de la Ciudad de Buenos Aires y permite analyzar variables"),
-      
-      selectInput("var", 
-                  label = "Elegir una variable a mostrar",
-                  
-                  choices = c("Area", "Perimeter",
-                              "ASP", "Paradas de colectivo a menos de 200mts",
-                              "Caniles","Juegos Para Niñes","Teatro",
-                              "Estación de ejercicio","Canchas",
-                              "Baños","Distancia a bicisenda",
-                              "Bebedores","Area mayor a media hectarea"),
-                  
-                  selected = "Area"),
-      
-      sliderInput("Limit", 
-                  label = "Area de los parques interes",
-                  min = 0, max = max(parques_full$area), value = c(0, 1000))
-    ),
-    
-    mainPanel(plotOutput("map"))
-  )
+  fluidRow( 
+    column(4, "Seleccion de Variable",varSelectInput(inputId = "var",label =  "Variable:", parques_full[33:42],))
+    ,
+    column(4, "Seleccion de corte de área", sliderInput(inputId = "range", label = "Rango de área", min=0, max=max(parques_full$area), value = c(5000,10000)))),
+ 
+  fluidRow( column(6, "Mapa de la ciudad",plotOutput("map",width =800,height = 800)),
+            column(4,"Distribucuón de la variable",tableOutput("summary")),
+            column(4,plotOutput("density")))
+  
 )
 
 # Server logic ----
-server <- function(input, output) {
+
+server <- function(input, output, session) {
+  
+  
+  output$summary <- renderTable({
+    summary(as.data.frame(parques_full) %>% dplyr::filter( area > input$range[1] & area < input$range[2]) %>% dplyr::select(!!input$var) )
+  })
+  
+  output$density <- renderPlot({
+    
+    ggplot(parques_full  %>% dplyr::filter( area > input$range[1] & area < input$range[2]) ,aes(x=!!input$var))+geom_density()+labs(title = paste("Distribución de",input$var,"de los parques en la ciuidad",subtitle = paste("Area recortada entre",input$range[1],"y",input$range[2],"metros cuadrados")))+ theme_minimal()
+   
+  }, res = 96)
+  
   
   output$map <- renderPlot({
     
-    data <- switch(input$var, "Area"= names(parques_full)[33], 
-                   "Perimeter"=names(parques_full)[34],
-                   "ASP"=names(parques_full)[35], 
-                   "Paradas de colectivo a menos de 200mts"=names(parques_full)[36],
-                   "Caniles"=names(parques_full)[37],
-                   "Juegos Para Niñes"=names(parques_full)[38],
-                   "Teatro"=names(parques_full)[39],
-                   "Estación de ejercicio"=names(parques_full)[40],
-                   "Canchas"=names(parques_full)[41],
-                   "Baños"=names(parques_full)[42],
-                   "Distancia a bicisenda"=names(parques_full)[43],
-                   "Bebedores"=names(parques_full)[44],
-                   "Area mayor a media hectarea"=names(parques_full)[45]
-                   )
+    ggplot() + theme_minimal()+ theme(legend.position = c(.8,.1))+
+      geom_sf(data=ciudad,fill='white') +
+      geom_sf(data=parques_full %>% dplyr::filter( area > input$range[1] & area < input$range[2]),mapping=aes(fill=!!input$var)) +
+      scale_fill_viridis_c(option = "plasma") +
+      labs(title = paste('Parques de la ciudad coloreados por ',input$var),subtitle = paste("Area recortada entre",input$range[1],"y",input$range[2],"metros cuadrados"))
     
-    
-    legend <- switch(input$var, "Area"=names(parques_full)[33], 
-                     "Perimeter"=names(parques_full)[34],
-                     "ASP"=names(parques_full)[35], 
-                     "Paradas de colectivo a menos de 200mts"=names(parques_full)[36],
-                     "Caniles"=names(parques_full)[37],
-                     "Juegos Para Niñes"=names(parques_full)[38],
-                     "Teatro"=names(parques_full)[39],
-                     "Estación de ejercicio"=names(parques_full)[40],
-                     "Canchas"=names(parques_full)[41],
-                     "Baños"=names(parques_full)[42],
-                     "Distancia a bicisenda"=names(parques_full)[43],
-                     "Bebedores"=names(parques_full)[44],
-                     "Area mayor a media hectarea"=names(parques_full)[45]
-    )
-    
-    
-    if(is.numeric(data[,var])){
-      
-      ggplot() + theme_minimal() + theme(legend.position = c(.8,.15)) +
-        geom_sf(var=ciudad,fill='white') +
-        geom_sf(var=parques_full %>% filter(area>=min & area<=max), mapping=aes(fill= var)) +
-        scale_fill_continuous(name= !!sym(var)) +
-        ggtitle(paste0('Parques coloreados por ',var))
-      
-    }else{
-      
-      ggplot() + theme_minimal() + theme(legend.position = c(.8,.15)) +
-        geom_sf(var=ciudad,fill='white') +
-        geom_sf(var=parques_full %>% filter(area>=min & area<=max), mapping=aes(fill= !!sym(var))) +
-        scale_fill_manual(values = c("darkgrey","darkorange")) +
-        ggtitle(paste0('Parques coloreados por ',var))
-      
-    }
-    
-  }
-  )
-
+  }, res = 96)
 }
 
 # Run app ----
